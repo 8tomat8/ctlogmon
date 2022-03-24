@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,13 +17,34 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var patternsArg = flag.String("patterns", "", "pass comma separated list of domains that you are interested in")
+var verboseArg = flag.Bool("verbose", false, "to print out logs")
+var outputArg = flag.String("out", "stdout", "supports file|stdout")
+
 func main() {
+	flag.Parse()
+
+	patterns := append([]string{}, strings.Split(*patternsArg, ",")...)
+	if *verboseArg {
+		logrus.SetLevel(logrus.InfoLevel)
+	} else {
+		logrus.SetLevel(0)
+	}
+
 	ll, err := cttools.GetLogLists(config.GoogleAllLogsLink)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	results, err := output.NewFileOutput(fmt.Sprintf("latest-%d", time.Now().Unix()))
+	var results chan string
+	switch *outputArg {
+	case "file":
+		fn := fmt.Sprintf("latest-%d.txt", time.Now().Unix())
+		results, err = output.NewFileOutput(fn)
+		fmt.Printf("Sending output to ./%s\n", fn)
+	case "stdout":
+		results, err = output.NewStdout()
+	}
 	if err != nil {
 		logrus.Fatalf("init output: %w", err)
 	}
@@ -70,7 +93,11 @@ func main() {
 							continue
 						}
 
-						results <- crt.Subject.CommonName
+						for _, p := range patterns {
+							if strings.Contains(crt.Subject.CommonName, p) {
+								results <- crt.Subject.CommonName
+							}
+						}
 					}
 
 					state.Set(list.URL, end)

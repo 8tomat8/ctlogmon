@@ -7,7 +7,7 @@ import (
 
 var OutputChannelSize = 1000
 
-func NewFileOutput(name string) (chan<- string, error) {
+func NewFileOutput(name string) (chan string, error) {
 	input := make(chan string, OutputChannelSize)
 
 	f, err := os.OpenFile(fmt.Sprintf("./%s", name), os.O_RDWR|os.O_CREATE, 0o644)
